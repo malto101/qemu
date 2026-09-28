@@ -252,7 +252,7 @@ static void hexagon_common_init(MachineState *machine, Rev_t rev,
     MemoryRegion *sram = g_new(MemoryRegion, 1);
     memory_region_init_ram(sram, NULL, "ddr.ram",
         machine->ram_size, &error_fatal);
-    memory_region_add_subregion(address_space, 0x0, sram);
+    memory_region_add_subregion(address_space, m_cfg->ddr_base, sram);
 
     uint32_t vtcm_size_bytes = m_cfg->cfgtable.vtcm_size_kb * 1024;
     if (vtcm_size_bytes > 0) {
