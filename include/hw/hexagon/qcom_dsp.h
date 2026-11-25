@@ -32,6 +32,16 @@ typedef struct QcomDspMachineInfo {
     hwaddr kernel_addr;
     /* Add the devices that are specific to this SoC; may be NULL. */
     void (*init_devices)(MachineState *ms);
+    /*
+     * Where "-machine ivshmem=<chardev>" puts an ivshmem-flat device: the
+     * shared memory where the SoC's GLINK shared-memory windows are, the
+     * registers in the doorbell's register window, and the interrupt the
+     * GLINK edge uses.  An SoC without these leaves ivshmem_size 0.
+     */
+    hwaddr ivshmem_base;
+    uint32_t ivshmem_size;
+    hwaddr ivshmem_mmio;
+    int ivshmem_irq;
 } QcomDspMachineInfo;
 
 struct QcomDspMachineState {
@@ -42,6 +52,7 @@ struct QcomDspMachineState {
     int fdt_size;
     hwaddr fdt_addr;
     char *firmware_path;
+    char *ivshmem;
 };
 
 struct QcomDspMachineClass {

@@ -50,6 +50,14 @@ static const QcomDspMachineInfo qcs6490_cdsp_info = {
     .cfg = &qcs6490_cdsp,
     .kernel_addr = 0xa1000000,
     .init_devices = qcs6490_cdsp_init_devices,
+    /*
+     * The windows and doorbell of the "glink-edge" in the CDSP's DT; H2 gives
+     * the guest L2VIC interrupt n as n + 32, so the DT names this one 91.
+     */
+    .ivshmem_base = 0xd7c00000,
+    .ivshmem_size = 0x20000,
+    .ivshmem_mmio = 0x0a388000,
+    .ivshmem_irq = 59,
 };
 
 static const TypeInfo qcs6490_cdsp_types[] = {

@@ -94,6 +94,7 @@
 #include "hw/cxl/cxl_host.h"
 #include "qemu/guest-random.h"
 #include "hw/watchdog/sbsa_gwdt.h"
+#include "hw/misc/ivshmem-flat.h"
 
 static GlobalProperty arm_virt_compat_defaults[] = {
     { TYPE_VIRTIO_IOMMU_PCI, "aw-bits", "48" },
@@ -1583,6 +1584,39 @@ static void create_rtc(const VirtMachineState *vms)
     qemu_fdt_setprop_cell(ms->fdt, nodename, "clocks", vms->clock_phandle);
     qemu_fdt_setprop_string(ms->fdt, nodename, "clock-names", "apb_pclk");
     g_free(nodename);
+}
+
+/*
+ * "-machine ivshmem=<chardev>": an ivshmem-flat device in the gap below the
+ * platform bus, for sharing memory and doorbells with a machine of another
+ * architecture.  The guest's device tree describes it as a plain node; an
+ * edge driver such as GLINK over shared memory is added by the user's DT.
+ */
+#define VIRT_IVSHMEM_MMIO   0x0b000000
+#define VIRT_IVSHMEM_SHMEM  0x0b100000
+#define VIRT_IVSHMEM_SIZE   0x20000
+#define VIRT_IVSHMEM_IRQ    100
+
+static void create_ivshmem(const VirtMachineState *vms)
+{
+    MachineState *ms = MACHINE(vms);
+    g_autofree char *nodename = g_strdup_printf("/ivshmem@%x",
+                                                VIRT_IVSHMEM_MMIO);
+
+    ivshmem_flat_create(vms->ivshmem, VIRT_IVSHMEM_SIZE, VIRT_IVSHMEM_MMIO,
+                        VIRT_IVSHMEM_SHMEM,
+                        qdev_get_gpio_in(vms->gic, VIRT_IVSHMEM_IRQ));
+
+    qemu_fdt_add_subnode(ms->fdt, nodename);
+    qemu_fdt_setprop_string(ms->fdt, nodename, "compatible",
+                            "qemu,ivshmem-flat");
+    qemu_fdt_setprop_sized_cells(ms->fdt, nodename, "reg",
+                                 2, VIRT_IVSHMEM_MMIO, 2, 0x10,
+                                 2, VIRT_IVSHMEM_SHMEM, 2, VIRT_IVSHMEM_SIZE);
+    qemu_fdt_setprop_cells(ms->fdt, nodename, "interrupts",
+                           gic_fdt_irq_type_spi(vms), VIRT_IVSHMEM_IRQ,
+                           GIC_FDT_IRQ_FLAGS_EDGE_LO_HI);
+    qemu_fdt_setprop_string(ms->fdt, nodename, "status", "disabled");
 }
 
 static DeviceState *gpio_key_dev;
@@ -3219,6 +3253,10 @@ static void machvirt_init(MachineState *machine)
 
     create_rtc(vms);
 
+    if (vms->ivshmem) {
+        create_ivshmem(vms);
+    }
+
     create_pcie(vms);
     create_cxl_host_reg_region(vms);
 
@@ -3534,6 +3572,19 @@ static char *virt_get_oem_id(Object *obj, Error **errp)
     VirtMachineState *vms = VIRT_MACHINE(obj);
 
     return g_strdup(vms->oem_id);
+}
+
+static char *virt_get_ivshmem(Object *obj, Error **errp)
+{
+    return g_strdup(VIRT_MACHINE(obj)->ivshmem);
+}
+
+static void virt_set_ivshmem(Object *obj, const char *value, Error **errp)
+{
+    VirtMachineState *vms = VIRT_MACHINE(obj);
+
+    g_free(vms->ivshmem);
+    vms->ivshmem = g_strdup(value);
 }
 
 static void virt_set_oem_id(Object *obj, const char *value, Error **errp)
@@ -4341,6 +4392,12 @@ static void virt_machine_class_init(ObjectClass *oc, const void *data)
                                    virt_set_dtb_randomness);
     object_class_property_set_description(oc, "dtb-kaslr-seed",
                                           "Deprecated synonym of dtb-randomness");
+
+    object_class_property_add_str(oc, "ivshmem", virt_get_ivshmem,
+                                  virt_set_ivshmem);
+    object_class_property_set_description(oc, "ivshmem",
+        "Chardev of an ivshmem-server: add an ivshmem-flat device for "
+        "sharing memory with another machine");
 
     object_class_property_add_str(oc, "x-oem-id",
                                   virt_get_oem_id,

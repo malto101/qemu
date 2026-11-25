@@ -14,6 +14,7 @@
 #include "hw/hexagon/hex-board.h"
 #include "hw/hexagon/hex-subsys.h"
 #include "hw/hexagon/qcom_dsp.h"
+#include "hw/misc/ivshmem-flat.h"
 #include "hw/misc/unimp.h"
 #include "qemu/datadir.h"
 #include "qemu/error-report.h"
@@ -197,6 +198,15 @@ static void qcom_dsp_init(MachineState *ms)
     if (info->init_devices) {
         info->init_devices(ms);
     }
+    if (qms->ivshmem) {
+        if (!info->ivshmem_size) {
+            error_report("%s has no ivshmem window", info->desc);
+            exit(1);
+        }
+        ivshmem_flat_create(qms->ivshmem, info->ivshmem_size,
+                            info->ivshmem_mmio, info->ivshmem_base,
+                            qdev_get_gpio_in(hms->l2vic, info->ivshmem_irq));
+    }
 
     if (ms->dtb) {
         g_free(ms->fdt);
@@ -220,9 +230,28 @@ static void qcom_dsp_init(MachineState *ms)
     }
 }
 
+static char *qcom_dsp_get_ivshmem(Object *obj, Error **errp)
+{
+    return g_strdup(QCOM_DSP_MACHINE(obj)->ivshmem);
+}
+
+static void qcom_dsp_set_ivshmem(Object *obj, const char *value, Error **errp)
+{
+    QcomDspMachineState *qms = QCOM_DSP_MACHINE(obj);
+
+    g_free(qms->ivshmem);
+    qms->ivshmem = g_strdup(value);
+}
+
 static void qcom_dsp_base_class_init(ObjectClass *oc, const void *data)
 {
     MachineClass *mc = MACHINE_CLASS(oc);
+
+    object_class_property_add_str(oc, "ivshmem", qcom_dsp_get_ivshmem,
+                                  qcom_dsp_set_ivshmem);
+    object_class_property_set_description(oc, "ivshmem",
+        "Chardev of an ivshmem-server: share the SoC's GLINK shared-memory "
+        "window and doorbell with another machine through ivshmem-flat");
 
     mc->init = qcom_dsp_init;
     mc->default_ram_size = 1 * GiB;

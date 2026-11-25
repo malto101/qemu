@@ -83,4 +83,13 @@ struct IvshmemFTState {
     uint32_t shmem_size;
 };
 
+/*
+ * Create an ivshmem-flat device on the ivshmem-server chardev @chardev_id,
+ * map its registers at @mmio_base and its shared memory at @shmem_base,
+ * and connect its interrupt to @irq.  Exits on error.
+ */
+DeviceState *ivshmem_flat_create(const char *chardev_id, uint32_t shmem_size,
+                                 hwaddr mmio_base, hwaddr shmem_base,
+                                 qemu_irq irq);
+
 #endif /* IVSHMEM_FLAT_H */

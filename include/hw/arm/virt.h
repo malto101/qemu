@@ -203,6 +203,7 @@ struct VirtMachineState {
     Notifier generic_error_notifier;
     PCIBus *bus;
     char *oem_id;
+    char *ivshmem;
     char *oem_table_id;
     bool ns_el2_virt_timer_irq;
     CXLState cxl_devices_state;

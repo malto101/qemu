@@ -450,6 +450,32 @@ static void ivshmem_flat_class_init(ObjectClass *klass, const void *data)
     dc->user_creatable = false;
 }
 
+DeviceState *ivshmem_flat_create(const char *chardev_id, uint32_t shmem_size,
+                                 hwaddr mmio_base, hwaddr shmem_base,
+                                 qemu_irq irq)
+{
+    Chardev *chr = qemu_chr_find(chardev_id);
+    DeviceState *dev;
+    SysBusDevice *sbd;
+
+    if (!chr) {
+        error_report("ivshmem-flat: no chardev '%s'", chardev_id);
+        exit(1);
+    }
+
+    dev = qdev_new(TYPE_IVSHMEM_FLAT);
+    sbd = SYS_BUS_DEVICE(dev);
+    qdev_prop_set_chr(dev, "chardev", chr);
+    qdev_prop_set_uint32(dev, "shmem-size", shmem_size);
+    sysbus_realize_and_unref(sbd, &error_fatal);
+    /* Above any unimplemented-device placeholder covering the same range. */
+    sysbus_mmio_map_overlap(sbd, 0, mmio_base, 1);
+    sysbus_mmio_map_overlap(sbd, 1, shmem_base, 1);
+    sysbus_connect_irq(sbd, 0, irq);
+
+    return dev;
+}
+
 static const TypeInfo ivshmem_flat_types[] = {
     {
         .name           = TYPE_IVSHMEM_FLAT,
